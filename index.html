@@ -30,6 +30,11 @@ button{border:0;border-radius:12px;padding:15px 18px;font-size:16px;font-weight:
 <div id="reader"><video id="video" playsinline muted></video><span id="cameraPlaceholder">Kamera henüz başlatılmadı</span></div>
 <button id="startBtn" class="primary">📷 KAMERAYI BAŞLAT</button>
 <button id="stopBtn" class="secondary" style="display:none">KAMERAYI DURDUR</button>
+<div id="zoomBox" style="display:none;margin-top:12px">
+<label for="zoomRange" style="font-weight:bold;color:#174d91">🔍 UZAK BARKOD ZOOM</label>
+<input id="zoomRange" type="range" min="1" max="3" step="0.1" value="1" style="width:100%;margin-top:8px">
+<p class="small">Barkod uzaktaysa zoom'u artır. Kamera destekliyorsa otomatik uygulanır.</p>
+</div>
 <p id="status">Hazır.</p>
 </div>
 <div class="card">
@@ -45,7 +50,7 @@ button{border:0;border-radius:12px;padding:15px 18px;font-size:16px;font-weight:
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <script>
 const readerEl=document.getElementById('reader'), videoEl=document.getElementById('video'), placeholder=document.getElementById('cameraPlaceholder'), result=document.getElementById('result'), status=document.getElementById('status');
-const startBtn=document.getElementById('startBtn'), stopBtn=document.getElementById('stopBtn');
+const startBtn=document.getElementById('startBtn'), stopBtn=document.getElementById('stopBtn'), zoomBox=document.getElementById('zoomBox'), zoomRange=document.getElementById('zoomRange');
 let controls=null,lastCode='',busy=false;
 function setResult(text,ok=false){result.textContent=text;result.className=ok?'success':''}
 async function lookup(code){
@@ -70,21 +75,22 @@ startBtn.onclick=async()=>{
    if(!html5QrCode) html5QrCode=new Html5Qrcode('reader', { experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
    placeholder.style.display='none';
    await html5QrCode.start(
-     {facingMode:{exact:'environment'}},
+     {facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080}},
      {fps:20, disableFlip:false, aspectRatio:1.3333,
       formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.CODE_93,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E]},
      (decodedText)=>{ lookup(decodedText); navigator.vibrate?.(100); },
      ()=>{}
    );
-   startBtn.style.display='none'; stopBtn.style.display='block'; status.textContent='Kamera açık. Barkodu çerçevenin ortasına, düz ve net şekilde tut.';
+   startBtn.style.display='none'; stopBtn.style.display='block'; zoomBox.style.display='block'; status.textContent='Kamera açık. Uzak barkod için gerekirse zoom’u artır.';
  }catch(e){
    try{
      await html5QrCode.start({facingMode:'environment'},{fps:10,qrbox:250},(t)=>{lookup(t);navigator.vibrate?.(100);},()=>{});
-     startBtn.style.display='none';stopBtn.style.display='block';status.textContent='Kamera açık. Barkodu okut.';
+     startBtn.style.display='none';stopBtn.style.display='block';zoomBox.style.display='block';status.textContent='Kamera açık. Barkodu okut.';
    }catch(e2){status.textContent='Kamera açılamadı: '+(e2.message||e2);status.className='error';}
  }
 };
-stopBtn.onclick=async()=>{try{if(html5QrCode?.isScanning)await html5QrCode.stop()}catch(e){} startBtn.style.display='block';stopBtn.style.display='none';placeholder.style.display='block';placeholder.textContent='Kamera durduruldu';status.textContent='Kamera durduruldu.'};
+zoomRange.oninput=async()=>{try{await html5QrCode.applyVideoConstraints({advanced:[{zoom:Number(zoomRange.value)}]});status.textContent='Zoom: '+zoomRange.value+'x • Barkodu ortada tut.'}catch(e){status.textContent='Bu cihaz zoom kontrolünü desteklemiyor; yüksek çözünürlükte tarama devam ediyor.';}};
+stopBtn.onclick=async()=>{try{if(html5QrCode?.isScanning)await html5QrCode.stop()}catch(e){} startBtn.style.display='block';stopBtn.style.display='none';zoomBox.style.display='none';placeholder.style.display='block';placeholder.textContent='Kamera durduruldu';status.textContent='Kamera durduruldu.'};
 document.getElementById('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(result.textContent);status.textContent='Ürün adı kopyalandı. Excel’e yapıştırabilirsin.'}catch(e){status.textContent='Kopyalama başarısız.'}};
 document.getElementById('manualBtn').onclick=()=>{const v=document.getElementById('manual').value.trim();if(v)lookup(v)};
 document.getElementById('manual').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('manualBtn').click()});
