@@ -69,28 +69,34 @@ async function lookup(code){
  finally{busy=false;}
 }
 let html5QrCode=null;
+const formats=[Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E];
+async function beginScan(){
+ if(html5QrCode){try{await html5QrCode.clear()}catch(e){}}
+ html5QrCode=new Html5Qrcode('reader');
+ await html5QrCode.start(
+   {facingMode:'environment'},
+   {fps:12, disableFlip:false, formatsToSupport:formats},
+   (decodedText)=>{lookup(decodedText);navigator.vibrate?.(100);},
+   ()=>{}
+ );
+}
 startBtn.onclick=async()=>{
  try{
-   status.className=''; status.textContent='Kamera açılıyor...';
-   if(!html5QrCode) html5QrCode=new Html5Qrcode('reader', { experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
+   status.className='';status.textContent='Kamera açılıyor...';
    placeholder.style.display='none';
-   await html5QrCode.start(
-     {facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080}},
-     {fps:20, disableFlip:false, aspectRatio:1.3333,
-      formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.CODE_93,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E]},
-     (decodedText)=>{ lookup(decodedText); navigator.vibrate?.(100); },
-     ()=>{}
-   );
-   startBtn.style.display='none'; stopBtn.style.display='block'; zoomBox.style.display='block'; status.textContent='Kamera açık. Uzak barkod için gerekirse zoom’u artır.';
+   await beginScan();
+   startBtn.style.display='none';stopBtn.style.display='block';zoomBox.style.display='none';
+   status.textContent='Kamera açık. Barkodu net şekilde kameraya tut.';
  }catch(e){
-   try{
-     await html5QrCode.start({facingMode:'environment'},{fps:10,qrbox:250},(t)=>{lookup(t);navigator.vibrate?.(100);},()=>{});
-     startBtn.style.display='none';stopBtn.style.display='block';zoomBox.style.display='block';status.textContent='Kamera açık. Barkodu okut.';
-   }catch(e2){status.textContent='Kamera açılamadı: '+(e2.message||e2);status.className='error';}
+   status.textContent='Kamera açılamadı: '+(e.message||e);
+   status.className='error';placeholder.style.display='block';
  }
 };
-zoomRange.oninput=async()=>{try{await html5QrCode.applyVideoConstraints({advanced:[{zoom:Number(zoomRange.value)}]});status.textContent='Zoom: '+zoomRange.value+'x • Barkodu ortada tut.'}catch(e){status.textContent='Bu cihaz zoom kontrolünü desteklemiyor; yüksek çözünürlükte tarama devam ediyor.';}};
-stopBtn.onclick=async()=>{try{if(html5QrCode?.isScanning)await html5QrCode.stop()}catch(e){} startBtn.style.display='block';stopBtn.style.display='none';zoomBox.style.display='none';placeholder.style.display='block';placeholder.textContent='Kamera durduruldu';status.textContent='Kamera durduruldu.'};
+stopBtn.onclick=async()=>{
+ try{await html5QrCode?.stop()}catch(e){}
+ startBtn.style.display='block';stopBtn.style.display='none';zoomBox.style.display='none';
+ placeholder.style.display='block';placeholder.textContent='Kamera durduruldu';status.textContent='Kamera durduruldu.';
+};
 document.getElementById('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(result.textContent);status.textContent='Ürün adı kopyalandı. Excel’e yapıştırabilirsin.'}catch(e){status.textContent='Kopyalama başarısız.'}};
 document.getElementById('manualBtn').onclick=()=>{const v=document.getElementById('manual').value.trim();if(v)lookup(v)};
 document.getElementById('manual').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('manualBtn').click()});
