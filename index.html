@@ -38,6 +38,13 @@ button{border:0;border-radius:12px;padding:15px 18px;font-size:16px;font-weight:
 <p id="status">Hazır.</p>
 </div>
 <div class="card">
+<h2>🔤 ÜRÜN ETİKETİNİ OKU</h2>
+<p class="hint">Barkod okumasa bile ürün kutusunun üzerindeki yazıları fotoğrafla. Sistem marka, model ve ürün tipini ayıklamaya çalışır.</p>
+<input id="photoInput" type="file" accept="image/*" capture="environment" style="display:none">
+<button id="photoBtn" class="primary">📸 ETİKETİN FOTOĞRAFINI ÇEK</button>
+<div id="ocrText" class="small" style="white-space:pre-wrap;margin-top:12px"></div>
+</div>
+<div class="card">
 <h2>🏷️ ÜRÜN ADI</h2>
 <div id="result">Henüz ürün okunmadı</div>
 <button id="copyBtn" class="secondary">📋 ÜRÜN ADINI KOPYALA</button>
@@ -48,6 +55,7 @@ button{border:0;border-radius:12px;padding:15px 18px;font-size:16px;font-weight:
 </main>
 <footer>Ürün Okuyucu</footer>
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 const readerEl=document.getElementById('reader'), videoEl=document.getElementById('video'), placeholder=document.getElementById('cameraPlaceholder'), result=document.getElementById('result'), status=document.getElementById('status');
 const startBtn=document.getElementById('startBtn'), stopBtn=document.getElementById('stopBtn'), zoomBox=document.getElementById('zoomBox'), zoomRange=document.getElementById('zoomRange');
@@ -122,6 +130,52 @@ stopBtn.onclick=async()=>{
  status.className='';
  status.textContent='Kamera durduruldu.';
 };
+
+// Ürün etiketi OCR
+const photoInput=document.getElementById('photoInput');
+const photoBtn=document.getElementById('photoBtn');
+const ocrText=document.getElementById('ocrText');
+photoBtn.onclick=()=>photoInput.click();
+
+function extractProductName(text){
+ const clean=text.replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n+/g,'\n').trim();
+ const upper=clean.toUpperCase();
+ let brand='';
+ const brands=['CHINT','SIEMENS','SCHNEIDER','ABB','EATON','OMRON','AUTONICS','DELTA','FINDER','PHOENIX','WAGO','TELEMECANIQUE','LS ELECTRIC'];
+ brand=brands.find(b=>upper.includes(b))||'';
+ let model='';
+ const patterns=[
+   /\bNXC[-\s]?\d+[A-Z0-9-]*\b/i,
+   /\b[A-Z]{1,6}[-\s]?\d{1,6}[A-Z0-9-]*\b/
+ ];
+ for(const re of patterns){const m=clean.match(re);if(m){model=m[0].replace(/\s+/g,'').toUpperCase();break;}}
+ let type='';
+ if(/AC\s*CONTACTOR/i.test(clean)||/CONTACTOR/i.test(clean)) type='AC Kontaktör';
+ else if(/CONTACT/i.test(clean)) type='Kontaktör';
+ else if(/CIRCUIT\s*BREAKER/i.test(clean)) type='Devre Kesici';
+ else if(/RELAY/i.test(clean)) type='Röle';
+ else if(/POWER\s*SUPPLY/i.test(clean)) type='Güç Kaynağı';
+ const voltage=(clean.match(/\b(?:AC\s*)?\d{2,4}\s*V(?:AC)?\b/i)||[])[0]||'';
+ const freq=(clean.match(/\b\d{2}\s*\/\s*\d{2}\s*HZ\b/i)||[])[0]||'';
+ const parts=[brand,model,type,voltage,freq].filter(Boolean);
+ return parts.join(' ').replace(/\s+/g,' ').trim();
+}
+photoInput.onchange=async()=>{
+ const file=photoInput.files?.[0]; if(!file)return;
+ photoBtn.disabled=true; ocrText.textContent='Yazılar okunuyor...';
+ setResult('Ürün etiketi analiz ediliyor...');
+ try{
+   const {data:{text}}=await Tesseract.recognize(file,'eng',{logger:m=>{
+     if(m.status==='recognizing text') ocrText.textContent='Okunuyor: %'+Math.round((m.progress||0)*100);
+   }});
+   const name=extractProductName(text);
+   if(name){setResult(name,true);status.textContent='Etiketten ürün bilgisi bulundu.';}
+   else {setResult('Ürün adı otomatik ayıklanamadı');status.textContent='Yazılar okundu; aşağıdaki metni kontrol et.';}
+   ocrText.textContent='OKUNAN YAZILAR:\n'+text.trim();
+ }catch(e){setResult('Okuma yapılamadı');status.textContent='Fotoğraf okunurken hata oluştu: '+(e.message||e);ocrText.textContent='';}
+ finally{photoBtn.disabled=false;photoInput.value='';}
+};
+
 document.getElementById('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(result.textContent);status.textContent='Ürün adı kopyalandı. Excel’e yapıştırabilirsin.'}catch(e){status.textContent='Kopyalama başarısız.'}};
 document.getElementById('manualBtn').onclick=()=>{const v=document.getElementById('manual').value.trim();if(v)lookup(v)};
 document.getElementById('manual').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('manualBtn').click()});
