@@ -67,7 +67,7 @@ startBtn.onclick=async()=>{
  try{
    status.textContent='Kamera açılıyor...';
    const codeReader=new BrowserMultiFormatReader();
-   placeholder.style.display='none'; videoEl.style.display='block'; controls=await codeReader.decodeFromVideoDevice(undefined,videoEl,(r,e)=>{
+   placeholder.style.display='none'; videoEl.style.display='block'; controls=await codeReader.decodeFromVideoDevice(undefined,'video',(r,e)=>{
      if(r){lookup(r.getText());navigator.vibrate?.(100);}
    });
    startBtn.style.display='none';stopBtn.style.display='block';status.textContent='Kamera açık. Barkodu okut.';
