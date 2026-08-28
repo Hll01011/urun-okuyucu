@@ -42,7 +42,7 @@ button{border:0;border-radius:12px;padding:15px 18px;font-size:16px;font-weight:
 <p class="hint">Barkod okumasa bile ürün kutusunun üzerindeki yazıları fotoğrafla. Sistem marka, model ve ürün tipini ayıklamaya çalışır.</p>
 <input id="photoInput" type="file" accept="image/*" capture="environment" style="display:none">
 <button id="photoBtn" class="primary">📸 ETİKETİN FOTOĞRAFINI ÇEK</button>
-<div id="ocrText" class="small" style="white-space:pre-wrap;margin-top:12px"></div>
+<div id="ocrText" class="small" style="white-space:pre-wrap;margin-top:12px;display:none"></div>
 </div>
 <div class="card">
 <h2>🏷️ ÜRÜN ADI</h2>
@@ -138,27 +138,35 @@ const ocrText=document.getElementById('ocrText');
 photoBtn.onclick=()=>photoInput.click();
 
 function extractProductName(text){
- const clean=text.replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n+/g,'\n').trim();
- const upper=clean.toUpperCase();
- let brand='';
- const brands=['CHINT','SIEMENS','SCHNEIDER','ABB','EATON','OMRON','AUTONICS','DELTA','FINDER','PHOENIX','WAGO','TELEMECANIQUE','LS ELECTRIC'];
- brand=brands.find(b=>upper.includes(b))||'';
- let model='';
- const patterns=[
-   /\bNXC[-\s]?\d+[A-Z0-9-]*\b/i,
-   /\b[A-Z]{1,6}[-\s]?\d{1,6}[A-Z0-9-]*\b/
+ const lines=text.replace(/\r/g,'').split('\n').map(x=>x.replace(/\s+/g,' ').trim()).filter(x=>x.length>1);
+ const upper=lines.map(x=>x.toUpperCase());
+ const brands=['CHINT','SIEMENS','SCHNEIDER','ABB','EATON','OMRON','AUTONICS','DELTA','FINDER','PHOENIX','WAGO','TELEMECANIQUE','LS ELECTRIC','CNC'];
+ const brandIndex=upper.findIndex(x=>brands.some(b=>x.includes(b)));
+ const brand=brandIndex>=0?brands.find(b=>upper[brandIndex].includes(b)):'';
+ const productWords=[
+   ['AC CONTACTOR','AC Kontaktör'],['CONTACTOR','Kontaktör'],['CIRCUIT BREAKER','Devre Kesici'],
+   ['RELAY','Röle'],['POWER SUPPLY','Güç Kaynağı'],['THERMAL','Termik Röle'],
+   ['PUSH BUTTON','Buton'],['SWITCH','Şalter'],['SENSOR','Sensör'],['INVERTER','İnverter']
  ];
- for(const re of patterns){const m=clean.match(re);if(m){model=m[0].replace(/\s+/g,'').toUpperCase();break;}}
  let type='';
- if(/AC\s*CONTACTOR/i.test(clean)||/CONTACTOR/i.test(clean)) type='AC Kontaktör';
- else if(/CONTACT/i.test(clean)) type='Kontaktör';
- else if(/CIRCUIT\s*BREAKER/i.test(clean)) type='Devre Kesici';
- else if(/RELAY/i.test(clean)) type='Röle';
- else if(/POWER\s*SUPPLY/i.test(clean)) type='Güç Kaynağı';
- const voltage=(clean.match(/\b(?:AC\s*)?\d{2,4}\s*V(?:AC)?\b/i)||[])[0]||'';
- const freq=(clean.match(/\b\d{2}\s*\/\s*\d{2}\s*HZ\b/i)||[])[0]||'';
- const parts=[brand,model,type,voltage,freq].filter(Boolean);
- return parts.join(' ').replace(/\s+/g,' ').trim();
+ for(const [word,label] of productWords){
+   const i=upper.findIndex(x=>x.includes(word));
+   if(i>=0){type=label;break;}
+ }
+ // Model sadece ürün/model satırlarından aranır; adres, tarih ve sertifika satırları dışarıda bırakılır.
+ const bad=/MADE IN|ADDRESS|AVENUE|STREET|TURKIYE|TURKEY|CHINA|SINGAPORE|EMAIL|WWW|IEC|CE\b|DATE|202\d|IPT:|EXP:|MR:/i;
+ const candidates=lines.filter((line,i)=>{
+   if(bad.test(line))return false;
+   if(i===brandIndex)return true;
+   return /[A-Z]{2,}[- ]?\d+[A-Z0-9-]*/i.test(line);
+ });
+ let model='';
+ for(const line of candidates){
+   const m=line.match(/\b(?:NXC|LC1D|3RT|A[0-9]|[A-Z]{2,6})[- ]?\d{1,6}[A-Z0-9-]*\b/i);
+   if(m && !/^AC$/i.test(m[0])){model=m[0].replace(/\s+/g,'').toUpperCase();break;}
+ }
+ const parts=[brand,model,type].filter(Boolean);
+ return parts.join(' ').trim();
 }
 photoInput.onchange=async()=>{
  const file=photoInput.files?.[0]; if(!file)return;
@@ -171,7 +179,7 @@ photoInput.onchange=async()=>{
    const name=extractProductName(text);
    if(name){setResult(name,true);status.textContent='Etiketten ürün bilgisi bulundu.';}
    else {setResult('Ürün adı otomatik ayıklanamadı');status.textContent='Yazılar okundu; aşağıdaki metni kontrol et.';}
-   ocrText.textContent='OKUNAN YAZILAR:\n'+text.trim();
+   ocrText.textContent='';
  }catch(e){setResult('Okuma yapılamadı');status.textContent='Fotoğraf okunurken hata oluştu: '+(e.message||e);ocrText.textContent='';}
  finally{photoBtn.disabled=false;photoInput.value='';}
 };
