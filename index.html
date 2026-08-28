@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#10233f">
+<title>Ürün Okuyucu</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f7fb;color:#162033}
+header{background:linear-gradient(135deg,#08172b,#173a67);color:#fff;padding:22px 18px}
+header h1{margin:0;font-size:25px}header p{margin:6px 0 0;color:#cbd8ea}
+main{max-width:720px;margin:auto;padding:18px}.card{background:#fff;border:1px solid #dbe3ef;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 8px 25px #1b35520d}
+h2{font-size:19px;margin:0 0 10px;color:#174d91}.hint{color:#637087;margin:0 0 15px}
+#reader{width:100%;min-height:260px;background:#0d1622;border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#b8c5d8}
+#reader video{width:100%;height:auto;display:block}
+button{border:0;border-radius:12px;padding:15px 18px;font-size:16px;font-weight:bold;cursor:pointer}
+.primary{width:100%;background:#1761c5;color:#fff}.secondary{background:#edf3fb;color:#174d91;margin-top:10px;width:100%}
+#result{font-size:28px;font-weight:800;min-height:76px;padding:18px;border-radius:14px;background:#f2f5f8;color:#607087;word-break:break-word}
+#status{margin-top:10px;color:#637087;font-size:14px}.success{background:#e9f8ef!important;color:#17683d!important}.error{color:#b42318!important}
+#manual{width:100%;padding:14px;border:1px solid #cfd8e6;border-radius:12px;font-size:16px;margin-top:10px}
+.small{font-size:13px;color:#7b8798;margin-top:10px}footer{text-align:center;padding:15px;color:#8a96a8;font-size:13px}
+</style>
+</head>
+<body>
+<header><h1>▣ ÜRÜN OKUYUCU</h1><p>QR / Barkod okut • Ürün adını bul</p></header>
+<main>
+<div class="card">
+<h2>📷 BARKOD / QR OKUT</h2>
+<p class="hint">Kamerayı üründeki barkoda veya QR koda tut.</p>
+<div id="reader">Kamera henüz başlatılmadı</div>
+<button id="startBtn" class="primary">📷 KAMERAYI BAŞLAT</button>
+<button id="stopBtn" class="secondary" style="display:none">KAMERAYI DURDUR</button>
+<p id="status">Hazır.</p>
+</div>
+<div class="card">
+<h2>🏷️ ÜRÜN ADI</h2>
+<div id="result">Henüz ürün okunmadı</div>
+<button id="copyBtn" class="secondary">📋 ÜRÜN ADINI KOPYALA</button>
+<p class="small">Barkod numarası otomatik olarak ürün adı için aranır. Bulunamazsa barkod numarası gösterilir.</p>
+<input id="manual" placeholder="İstersen barkod numarasını buraya yaz">
+<button id="manualBtn" class="secondary">ARA</button>
+</div>
+</main>
+<footer>Ürün Okuyucu</footer>
+<script type="module">
+import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm';
+const readerEl=document.getElementById('reader'), result=document.getElementById('result'), status=document.getElementById('status');
+const startBtn=document.getElementById('startBtn'), stopBtn=document.getElementById('stopBtn');
+let controls=null,lastCode='',busy=false;
+function setResult(text,ok=false){result.textContent=text;result.className=ok?'success':''}
+async function lookup(code){
+ if(busy||code===lastCode)return; busy=true; lastCode=code;
+ setResult('Ürün aranıyor...'); status.textContent='Barkod: '+code;
+ try{
+   const res=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json');
+   const data=await res.json();
+   if(data && data.status===1 && data.product){
+     const p=data.product;
+     const name=p.product_name_tr||p.product_name||p.product_name_en||p.brands;
+     if(name){setResult(name,true);status.textContent='Ürün bulundu • Barkod: '+code;return;}
+   }
+   setResult(code,true);status.textContent='Ürün adı bulunamadı. Barkod numarası gösteriliyor: '+code;
+ }catch(e){setResult(code,true);status.textContent='İnternet araması yapılamadı. Barkod: '+code;}
+ finally{busy=false;}
+}
+startBtn.onclick=async()=>{
+ try{
+   status.textContent='Kamera açılıyor...';
+   const codeReader=new BrowserMultiFormatReader();
+   controls=await codeReader.decodeFromVideoDevice(undefined,readerEl,(r,e)=>{
+     if(r){lookup(r.getText());navigator.vibrate?.(100);}
+   });
+   startBtn.style.display='none';stopBtn.style.display='block';status.textContent='Kamera açık. Barkodu okut.';
+ }catch(e){status.textContent='Kamera açılamadı: '+e.message;status.className='error';}
+};
+stopBtn.onclick=()=>{controls?.stop();controls=null;startBtn.style.display='block';stopBtn.style.display='none';readerEl.innerHTML='Kamera durduruldu';status.textContent='Kamera durduruldu.'};
+document.getElementById('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(result.textContent);status.textContent='Ürün adı kopyalandı. Excel’e yapıştırabilirsin.'}catch(e){status.textContent='Kopyalama başarısız.'}};
+document.getElementById('manualBtn').onclick=()=>{const v=document.getElementById('manual').value.trim();if(v)lookup(v)};
+document.getElementById('manual').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('manualBtn').click()});
+</script>
+</body>
+</html>
