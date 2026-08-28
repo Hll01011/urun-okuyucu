@@ -67,16 +67,16 @@ let html5QrCode=null;
 startBtn.onclick=async()=>{
  try{
    status.className=''; status.textContent='Kamera açılıyor...';
-   if(!html5QrCode) html5QrCode=new Html5Qrcode('reader');
+   if(!html5QrCode) html5QrCode=new Html5Qrcode('reader', { experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
    placeholder.style.display='none';
    await html5QrCode.start(
      {facingMode:{exact:'environment'}},
-     {fps:12, qrbox:{width:300,height:180}, aspectRatio:1.7778,
-      formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E]},
+     {fps:20, disableFlip:false, aspectRatio:1.3333,
+      formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.CODE_93,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E]},
      (decodedText)=>{ lookup(decodedText); navigator.vibrate?.(100); },
      ()=>{}
    );
-   startBtn.style.display='none'; stopBtn.style.display='block'; status.textContent='Kamera açık. Barkodu net şekilde kameraya tut.';
+   startBtn.style.display='none'; stopBtn.style.display='block'; status.textContent='Kamera açık. Barkodu çerçevenin ortasına, düz ve net şekilde tut.';
  }catch(e){
    try{
      await html5QrCode.start({facingMode:'environment'},{fps:10,qrbox:250},(t)=>{lookup(t);navigator.vibrate?.(100);},()=>{});
