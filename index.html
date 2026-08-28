@@ -12,7 +12,7 @@ header h1{margin:0;font-size:25px}header p{margin:6px 0 0;color:#cbd8ea}
 main{max-width:720px;margin:auto;padding:18px}.card{background:#fff;border:1px solid #dbe3ef;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 8px 25px #1b35520d}
 h2{font-size:19px;margin:0 0 10px;color:#174d91}.hint{color:#637087;margin:0 0 15px}
 #reader{width:100%;min-height:260px;background:#0d1622;border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#b8c5d8}
-#reader video{width:100%;height:auto;display:block}
+#reader{position:relative}#reader video{width:100%;height:auto;display:none}#cameraPlaceholder{position:absolute}
 button{border:0;border-radius:12px;padding:15px 18px;font-size:16px;font-weight:bold;cursor:pointer}
 .primary{width:100%;background:#1761c5;color:#fff}.secondary{background:#edf3fb;color:#174d91;margin-top:10px;width:100%}
 #result{font-size:28px;font-weight:800;min-height:76px;padding:18px;border-radius:14px;background:#f2f5f8;color:#607087;word-break:break-word}
@@ -27,7 +27,7 @@ button{border:0;border-radius:12px;padding:15px 18px;font-size:16px;font-weight:
 <div class="card">
 <h2>📷 BARKOD / QR OKUT</h2>
 <p class="hint">Kamerayı üründeki barkoda veya QR koda tut.</p>
-<div id="reader">Kamera henüz başlatılmadı</div>
+<div id="reader"><video id="video" playsinline muted></video><span id="cameraPlaceholder">Kamera henüz başlatılmadı</span></div>
 <button id="startBtn" class="primary">📷 KAMERAYI BAŞLAT</button>
 <button id="stopBtn" class="secondary" style="display:none">KAMERAYI DURDUR</button>
 <p id="status">Hazır.</p>
@@ -44,7 +44,7 @@ button{border:0;border-radius:12px;padding:15px 18px;font-size:16px;font-weight:
 <footer>Ürün Okuyucu</footer>
 <script type="module">
 import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm';
-const readerEl=document.getElementById('reader'), result=document.getElementById('result'), status=document.getElementById('status');
+const readerEl=document.getElementById('reader'), videoEl=document.getElementById('video'), placeholder=document.getElementById('cameraPlaceholder'), result=document.getElementById('result'), status=document.getElementById('status');
 const startBtn=document.getElementById('startBtn'), stopBtn=document.getElementById('stopBtn');
 let controls=null,lastCode='',busy=false;
 function setResult(text,ok=false){result.textContent=text;result.className=ok?'success':''}
@@ -67,13 +67,13 @@ startBtn.onclick=async()=>{
  try{
    status.textContent='Kamera açılıyor...';
    const codeReader=new BrowserMultiFormatReader();
-   controls=await codeReader.decodeFromVideoDevice(undefined,readerEl,(r,e)=>{
+   placeholder.style.display='none'; videoEl.style.display='block'; controls=await codeReader.decodeFromVideoDevice(undefined,videoEl,(r,e)=>{
      if(r){lookup(r.getText());navigator.vibrate?.(100);}
    });
    startBtn.style.display='none';stopBtn.style.display='block';status.textContent='Kamera açık. Barkodu okut.';
  }catch(e){status.textContent='Kamera açılamadı: '+e.message;status.className='error';}
 };
-stopBtn.onclick=()=>{controls?.stop();controls=null;startBtn.style.display='block';stopBtn.style.display='none';readerEl.innerHTML='Kamera durduruldu';status.textContent='Kamera durduruldu.'};
+stopBtn.onclick=()=>{controls?.stop();controls=null;startBtn.style.display='block';stopBtn.style.display='none';videoEl.style.display='none';placeholder.style.display='block';placeholder.textContent='Kamera durduruldu';status.textContent='Kamera durduruldu.'};
 document.getElementById('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(result.textContent);status.textContent='Ürün adı kopyalandı. Excel’e yapıştırabilirsin.'}catch(e){status.textContent='Kopyalama başarısız.'}};
 document.getElementById('manualBtn').onclick=()=>{const v=document.getElementById('manual').value.trim();if(v)lookup(v)};
 document.getElementById('manual').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('manualBtn').click()});
